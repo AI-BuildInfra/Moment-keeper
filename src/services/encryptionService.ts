@@ -20,7 +20,7 @@ async function deriveKey(passkey: string, uid: string): Promise<CryptoKey> {
     {
       name: 'PBKDF2',
       salt: saltBytes,
-      iterations: 50000,
+      iterations: 600000, // OWASP 2023 recommendation for PBKDF2-SHA-256
       hash: 'SHA-256'
     },
     keyMaterial,

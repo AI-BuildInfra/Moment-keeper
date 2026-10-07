@@ -1,6 +1,6 @@
 // ─── LoginPage Component ─────────────────────────────────────
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as zod from 'zod';
@@ -20,9 +20,15 @@ const loginSchema = zod.object({
 type LoginFormInputs = zod.infer<typeof loginSchema>;
 
 export const LoginPage: React.FC = () => {
-  const { logIn, loading, error } = useAuthStore();
+  const { user, initialized, logIn, loading, error } = useAuthStore();
   const { isOnline } = useUIStore();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (initialized && user) {
+      navigate('/', { replace: true });
+    }
+  }, [user, initialized, navigate]);
 
   const {
     register,

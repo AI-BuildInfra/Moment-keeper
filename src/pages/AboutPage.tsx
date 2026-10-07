@@ -41,9 +41,27 @@ export const AboutPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="pt-6 border-t border-mk-glass-border/40 flex items-center justify-between text-xs text-mk-silver">
+        <div className="pt-6 border-t border-mk-glass-border/40 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-mk-silver">
           <span>App Version: 1.0.0 (Gold Release)</span>
-          <span>Designed with silver luxury styling</span>
+          <div className="flex items-center gap-4">
+            <a
+              href="https://aibuildinfra.com/projects/moment-keeper"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-mk-accent hover:underline flex items-center gap-1 font-semibold"
+            >
+              aibuildinfra.com/projects/moment-keeper
+            </a>
+            <span>•</span>
+            <a
+              href="https://github.com/AI-BuildInfra/Moment-keeper"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-mk-silver hover:text-mk-white transition-colors"
+            >
+              GitHub
+            </a>
+          </div>
         </div>
       </div>
     </div>

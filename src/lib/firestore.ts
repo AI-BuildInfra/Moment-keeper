@@ -17,15 +17,20 @@ export const COLLECTIONS = {
   groups:     'groups',
 } as const;
 
-// Helper function to strip undefined keys from payloads before writing to Firestore
-export const cleanPayload = (obj: any) => {
-  const cleaned = { ...obj };
-  Object.keys(cleaned).forEach((key) => {
-    if (cleaned[key] === undefined) {
-      delete cleaned[key];
+// Helper function to strip undefined and forbidden prototype keys before writing to Firestore
+const FORBIDDEN_PROTOTYPE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+export const cleanPayload = <T extends Record<string, any>>(obj: T): Partial<T> => {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return obj;
+  const cleaned: Record<string, any> = {};
+  for (const key of Object.keys(obj)) {
+    if (FORBIDDEN_PROTOTYPE_KEYS.has(key)) continue;
+    const val = (obj as any)[key];
+    if (val !== undefined) {
+      cleaned[key] = val;
     }
-  });
-  return cleaned;
+  }
+  return cleaned as Partial<T>;
 };
 
 // ── User Profile ──────────────────────────────────────────────
@@ -37,12 +42,11 @@ export const getUserProfile = async (uid: string): Promise<UserProfile | null> =
     const secretSnap = await getDoc(doc(db, COLLECTIONS.users, uid, 'private', 'secrets'));
     if (secretSnap.exists()) {
       profile.privatePasskey = secretSnap.data().privatePasskey;
-    } else {
-      profile.privatePasskey = '1234';
     }
+    // No fallback to '1234' — undefined means the user has not set a passkey yet.
+    // Callers must check for undefined and prompt the user to set one before encrypting.
   } catch (err) {
     console.warn('Failed to load user secrets:', err);
-    profile.privatePasskey = '1234';
   }
   return profile;
 };
@@ -117,7 +121,7 @@ export const createEvent = async (event: Omit<MKEvent, 'id' | 'createdAt' | 'upd
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
-  console.log("FIRESTORE addDoc calling with payload:", finalPayload);
+  // Removed: console.log — do not log event payloads (personal data leaks in DevTools / adb logcat)
   const ref = await addDoc(collection(db, COLLECTIONS.events), finalPayload);
   return ref.id;
 };
@@ -185,10 +189,64 @@ export const deletePerson = async (id: string) => {
   await deleteDoc(doc(db, COLLECTIONS.persons, id));
 };
 
+// ── Magic Byte Header Signatures ──────────────────────────────
+// Validates actual file binary header regardless of file extension or renamed spoofing
+type ImageFormat = 'jpeg' | 'png' | 'webp' | 'gif';
+
+const detectRealImageType = async (blob: Blob): Promise<ImageFormat | null> => {
+  const buffer = await blob.slice(0, 16).arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+
+  // JPEG: FF D8 FF
+  if (bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF) {
+    return 'jpeg';
+  }
+  // PNG: 89 50 4E 47 0D 0A 1A 0A
+  if (
+    bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47 &&
+    bytes[4] === 0x0D && bytes[5] === 0x0A && bytes[6] === 0x1A && bytes[7] === 0x0A
+  ) {
+    return 'png';
+  }
+  // GIF: 47 49 46 38 (GIF87a or GIF89a)
+  if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x38) {
+    return 'gif';
+  }
+  // WebP: RIFF....WEBP (52 49 46 46 .... 57 45 42 50)
+  if (
+    bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+    bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50
+  ) {
+    return 'webp';
+  }
+  return null;
+};
+
+// CRITICAL FIX #3: Validate file magic byte signatures, type, and size before uploading.
+// Disguised files (e.g. mal.js -> mal.png or payload.html -> payload.jpg) are strictly blocked!
+const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+const MAX_PHOTO_BYTES = 5 * 1024 * 1024; // 5 MB
+
 export const uploadPersonPhoto = async (userId: string, personId: string, blob: Blob): Promise<string> => {
-  const path = `users/${userId}/persons/${personId}/${Date.now()}_photo.jpg`;
+  // 1. Validate claimed MIME type
+  if (!ALLOWED_IMAGE_TYPES.has(blob.type)) {
+    throw new Error(`Invalid file type "${blob.type}". Only JPEG, PNG, WebP, and GIF images are allowed.`);
+  }
+
+  // 2. Validate size
+  if (blob.size > MAX_PHOTO_BYTES) {
+    throw new Error(`File too large (${(blob.size / 1024 / 1024).toFixed(1)} MB). Maximum allowed size is 5 MB.`);
+  }
+
+  // 3. Binary Magic Byte Validation: verifies the ACTUAL file contents match a real image format
+  const detectedType = await detectRealImageType(blob);
+  if (!detectedType) {
+    throw new Error('File validation failed: File content does not match genuine image binary signature. Disguised files (.js, .html, .exe) are blocked.');
+  }
+
+  const path = `users/${userId}/persons/${personId}/${Date.now()}_photo.${detectedType}`;
   const fileRef = storageRef(storage, path);
-  await uploadBytes(fileRef, blob, { contentType: 'image/jpeg' });
+  await uploadBytes(fileRef, blob, { contentType: `image/${detectedType}` });
   const downloadUrl = await getDownloadURL(fileRef);
   return downloadUrl;
 };
@@ -214,12 +272,21 @@ export const createGroup = async (group: Omit<Group, 'id' | 'createdAt'>) => {
 
 export const getUserProfiles = async (uids: string[]): Promise<UserProfile[]> => {
   if (uids.length === 0) return [];
-  const q = query(
-    collection(db, COLLECTIONS.users),
-    where('uid', 'in', uids)
-  );
-  const snap = await getDocs(q);
-  return snap.docs.map(d => d.data() as UserProfile);
+  const uniqueUids = Array.from(new Set(uids));
+  const chunkSize = 30; // Firestore 'in' queries limit is 30
+  const results: UserProfile[] = [];
+
+  for (let i = 0; i < uniqueUids.length; i += chunkSize) {
+    const chunk = uniqueUids.slice(i, i + chunkSize);
+    const q = query(
+      collection(db, COLLECTIONS.users),
+      where('uid', 'in', chunk)
+    );
+    const snap = await getDocs(q);
+    snap.docs.forEach(d => results.push(d.data() as UserProfile));
+  }
+
+  return results;
 };
 
 export const subscribeToGroups = (
@@ -401,7 +468,9 @@ export const subscribeToUserProfile = (
     if (profileData) {
       callback({
         ...profileData,
-        privatePasskey: passkeyVal || '1234'
+        // privatePasskey is undefined if the user has never set one.
+        // The UI must prompt users to create a passkey before using private events.
+        privatePasskey: passkeyVal
       });
     } else {
       callback(null);
@@ -417,12 +486,12 @@ export const subscribeToUserProfile = (
     if (snap.exists()) {
       passkeyVal = snap.data().privatePasskey;
     } else {
-      passkeyVal = '1234';
+      passkeyVal = undefined; // No passkey set yet — do not fall back to '1234'
     }
     emit();
   }, (err) => {
     console.warn('Failed to subscribe to secrets:', err);
-    passkeyVal = '1234';
+    passkeyVal = undefined;
     emit();
   });
 

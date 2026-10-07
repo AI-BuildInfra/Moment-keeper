@@ -1,7 +1,13 @@
 {
   "name": "moment-keeper",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "Life-event reminder, milestone tracker, and private encrypted memory vault application built with React, TypeScript, Vite, Tailwind CSS, Capacitor, and Firebase.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AI-BuildInfra/Moment-keeper.git"
+  },
+  "homepage": "https://aibuildinfra.com/projects/moment-keeper",
   "type": "module",
   "scripts": {
     "dev": "vite",

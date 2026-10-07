@@ -259,7 +259,7 @@ export const ContactImportModal: React.FC<ContactImportModalProps> = ({ isOpen, 
           isFavorite: false,
         };
 
-        const personId = await addPerson(personPayload);
+        const personId = await addPerson(personPayload, null, { skipRateLimit: true });
 
         const finalBirthday = contact.birthday || customBirthdays[contact.id];
         if (finalBirthday) {
@@ -284,7 +284,7 @@ export const ContactImportModal: React.FC<ContactImportModalProps> = ({ isOpen, 
             notes: `Auto-generated from contacts import. Keep this date special!`,
           };
 
-          await addEvent(eventPayload);
+          await addEvent(eventPayload, { skipRateLimit: true });
         }
         successCount++;
       }
@@ -526,7 +526,7 @@ export const ContactImportModal: React.FC<ContactImportModalProps> = ({ isOpen, 
           isFavorite: false,
         };
 
-        const personId = await addPerson(personPayload);
+        const personId = await addPerson(personPayload, null, { skipRateLimit: true });
 
         const finalDate = customCalendarBirthdays[event.id] || event.date;
         if (finalDate) {
@@ -551,7 +551,7 @@ export const ContactImportModal: React.FC<ContactImportModalProps> = ({ isOpen, 
             notes: `Auto-generated from Google Calendar import.`,
           };
 
-          await addEvent(eventPayload);
+          await addEvent(eventPayload, { skipRateLimit: true });
         }
         successCount++;
       }

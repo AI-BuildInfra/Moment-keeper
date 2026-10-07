@@ -27,7 +27,13 @@ const eventSchema = zod.object({
   priority: zod.enum(['low', 'medium', 'high', 'critical'] as const).optional(),
   tagsInput: zod.string().optional(),
   notes: zod.string().optional(),
-  spotifyUrl: zod.string().optional(),
+  spotifyUrl: zod
+    .string()
+    .optional()
+    .refine(
+      (val) => !val || val.trim() === '' || /^https:\/\/open\.spotify\.com\/(track|album|playlist)\/[a-zA-Z0-9]+/.test(val.trim()),
+      { message: 'Must be a valid Spotify link (https://open.spotify.com/...)' }
+    ),
   groupId: zod.string().optional(),
 });
 
@@ -212,8 +218,7 @@ export const EventFormModal: React.FC<EventFormModalProps> = ({ isOpen, onClose,
       groupId: data.groupId || undefined,
     };
 
-    console.log("SUBMITTING EVENT PAYLOAD TO ZUSTAND:", eventPayload);
-
+    // Sensitive console.log removed
     hapticService.success();
 
     if (editingEvent) {

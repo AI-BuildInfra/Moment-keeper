@@ -33,6 +33,8 @@ export function getDaysUntilEvent(eventDate: string, isRecurring: boolean = fals
 export function getNextOccurrence(eventDate: string): Date {
   const today = startOfDay(new Date());
   let date = startOfDay(parseISO(eventDate));
+  // Guard: if parsing yields an invalid date, return today to avoid infinite loop
+  if (isNaN(date.getTime())) return today;
   while (date < today) {
     date = addYears(date, 1);
   }
@@ -140,5 +142,8 @@ export function getInitials(name: string): string {
 
 // ── ID Generation ─────────────────────────────────────────────
 export function generateId(): string {
-  return Math.random().toString(36).slice(2) + Date.now().toString(36);
+  // Use CSPRNG — Math.random() is predictable and not safe for IDs
+  const arr = new Uint8Array(16);
+  crypto.getRandomValues(arr);
+  return Array.from(arr, b => b.toString(16).padStart(2, '0')).join('');
 }

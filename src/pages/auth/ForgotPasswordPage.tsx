@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as zod from 'zod';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -16,8 +16,15 @@ const forgotSchema = zod.object({
 type ForgotFormInputs = zod.infer<typeof forgotSchema>;
 
 export const ForgotPasswordPage: React.FC = () => {
-  const { resetPassword, loading, error } = useAuthStore();
+  const { user, initialized, resetPassword, loading, error } = useAuthStore();
+  const navigate = useNavigate();
   const [sent, setSent] = useState(false);
+
+  React.useEffect(() => {
+    if (initialized && user) {
+      navigate('/', { replace: true });
+    }
+  }, [user, initialized, navigate]);
 
   const {
     register,
@@ -30,11 +37,13 @@ export const ForgotPasswordPage: React.FC = () => {
   const onSubmit = async (data: ForgotFormInputs) => {
     try {
       await resetPassword(data.email);
-      setSent(true);
-      toast.success('Password reset email sent!');
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to send reset link.');
+    } catch {
+      // Intentionally ignore error — do NOT reveal whether the email is registered
+      // (prevents email enumeration: attacker cannot tell if an account exists)
     }
+    // Always show the same success-style message regardless of outcome
+    setSent(true);
+    toast.success('If this email is registered, a reset link has been sent.');
   };
 
   return (

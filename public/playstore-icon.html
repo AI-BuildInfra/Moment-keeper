@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 512px; height: 512px; overflow: hidden; background: #0A0A0A; }
+  svg { display: block; width: 512px; height: 512px; }
+</style>
+</head>
+<body>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background Gradient (Dark Grey/Black Luxury) -->
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1E2024" />
+      <stop offset="50%" stop-color="#121316" />
+      <stop offset="100%" stop-color="#08080A" />
+    </linearGradient>
+
+    <!-- Dark luxury box background gradient -->
+    <linearGradient id="boxGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2E2E2E" />
+      <stop offset="50%" stop-color="#1E1E1E" />
+      <stop offset="100%" stop-color="#0F0F0F" />
+    </linearGradient>
+
+    <!-- Metallic silver ribbon gradient -->
+    <linearGradient id="ribbonGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="35%" stop-color="#E5E7EB" />
+      <stop offset="65%" stop-color="#9CA3AF" />
+      <stop offset="100%" stop-color="#4B5563" />
+    </linearGradient>
+
+    <!-- Embossed medallion background -->
+    <radialGradient id="medallionGradient" cx="50%" cy="50%" r="50%" fx="30%" fy="30%">
+      <stop offset="0%" stop-color="#374151" />
+      <stop offset="70%" stop-color="#1F2937" />
+      <stop offset="100%" stop-color="#111827" />
+    </radialGradient>
+
+    <!-- Subtle luxury glow filter -->
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="3" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Full-bleed background for Google Play Store (Square, no pre-rounded corners) -->
+  <rect width="512" height="512" fill="url(#bgGradient)" />
+
+  <!-- Subtle vignette border -->
+  <rect width="512" height="512" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="2" />
+
+  <g transform="scale(4.0) translate(14, 14)">
+    <!-- Left Bow Loop -->
+    <path d="M 50 26 C 28 8 22 25 47 27 Z" fill="url(#ribbonGradient)" />
+
+    <!-- Right Bow Loop -->
+    <path d="M 50 26 C 72 8 78 25 53 27 Z" fill="url(#ribbonGradient)" />
+
+    <!-- Bow Tails -->
+    <path d="M 46 26 C 36 34 32 45 30 52 C 34 48 42 38 46 28 Z" fill="url(#ribbonGradient)" opacity="0.8" />
+    <path d="M 54 26 C 64 34 68 45 70 52 C 66 48 58 38 54 28 Z" fill="url(#ribbonGradient)" opacity="0.8" />
+
+    <!-- Main Box Body -->
+    <rect x="18" y="36" width="64" height="52" rx="8" fill="url(#boxGradient)" stroke="rgba(255,255,255,0.08)" stroke-width="1.2" />
+
+    <!-- Box Lid -->
+    <rect x="14" y="27" width="72" height="11" rx="3" fill="url(#boxGradient)" stroke="rgba(255,255,255,0.12)" stroke-width="1.2" />
+
+    <!-- Vertical Ribbon -->
+    <rect x="44" y="27" width="12" height="61" fill="url(#ribbonGradient)" />
+
+    <!-- Horizontal Ribbon -->
+    <rect x="18" y="56" width="64" height="11" fill="url(#ribbonGradient)" />
+
+    <!-- Bow Knot -->
+    <circle cx="50" cy="26" r="6" fill="url(#ribbonGradient)" />
+    <circle cx="50" cy="26" r="4.5" fill="#FFFFFF" opacity="0.25" />
+
+    <!-- Central Medallion -->
+    <circle cx="50" cy="62" r="17" fill="url(#medallionGradient)" stroke="url(#ribbonGradient)" stroke-width="1.6" filter="url(#glow)" />
+    <circle cx="50" cy="62" r="14.5" fill="none" stroke="rgba(255, 255, 255, 0.08)" stroke-width="1" />
+
+    <!-- Embossed Letter 'M' -->
+    <text x="50" y="68" text-anchor="middle" font-family="'Segoe UI', Roboto, system-ui, -apple-system, sans-serif" font-weight="900" font-size="17" fill="url(#ribbonGradient)" letter-spacing="0">
+      M
+    </text>
+  </g>
+</svg>
+</body>
+</html>

@@ -1,6 +1,7 @@
 // ─── Firebase Configuration ─────────────────────────────────
-// IMPORTANT: Replace these placeholder values with your real Firebase config.
-// Go to: https://console.firebase.google.com → Project Settings → Your Apps → Web App
+// All credentials come exclusively from environment variables.
+// Never add || "fallback-value" hardcoded strings — they would be
+// embedded in the production bundle and visible to anyone.
 // ────────────────────────────────────────────────────────────
 
 import { initializeApp, getApps, getApp } from 'firebase/app';
@@ -12,26 +13,23 @@ import {
   indexedDBLocalPersistence,
 } from 'firebase/auth';
 import {
-  getFirestore,
   initializeFirestore,
   persistentLocalCache,
   persistentMultipleTabManager,
-  CACHE_SIZE_UNLIMITED,
 } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getAnalytics, isSupported } from 'firebase/analytics';
 import { getMessaging, isSupported as isFCMSupported } from 'firebase/messaging';
 
-// ── YOUR FIREBASE CONFIG ──────────────────────────────────────
-// Replace with your real config from Firebase Console
+// ── FIREBASE CONFIG (env-only, no hardcoded fallbacks) ────────
 export const firebaseConfig = {
-  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDlFbtCCHwFfJ6XKSGjw5GFsiAC7o81JJ0",
-  authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "moment-keeper-498111.firebaseapp.com",
-  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID || "moment-keeper-498111",
-  storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "moment-keeper-498111.firebasestorage.app",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "585904704264",
-  appId:             import.meta.env.VITE_FIREBASE_APP_ID || "1:585904704264:web:3d91509aec8996ac497abd",
-  measurementId:     import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-V1CJ04WZ1Z",
+  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId:             import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId:     import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 // ──────────────────────────────────────────────────────────────
 
@@ -48,10 +46,11 @@ setPersistence(auth, indexedDBLocalPersistence).catch(() => {
 });
 
 // Firestore with offline persistence
+// Cache is capped at 100 MB to prevent unbounded device storage usage.
 export const db = initializeFirestore(app, {
   localCache: persistentLocalCache({
     tabManager: persistentMultipleTabManager(),
-    cacheSizeBytes: CACHE_SIZE_UNLIMITED,
+    cacheSizeBytes: 100 * 1024 * 1024, // 100 MB max
   }),
   ignoreUndefinedProperties: true,
 });
@@ -60,9 +59,9 @@ export const db = initializeFirestore(app, {
 export const storage = getStorage(app);
 
 // Google Auth Provider
+// Firebase already requests openid + email + profile by default.
+// Adding extra scopes explicitly is redundant and broadens the OAuth consent dialog.
 export const googleProvider = new GoogleAuthProvider();
-googleProvider.addScope('https://www.googleapis.com/auth/userinfo.profile');
-googleProvider.addScope('https://www.googleapis.com/auth/userinfo.email');
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 // Analytics (async, browser only)

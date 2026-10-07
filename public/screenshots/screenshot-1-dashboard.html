@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Never Miss a Moment</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 1080px;
+    height: 1920px;
+    overflow: hidden;
+    background: #08080B;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    color: #FFFFFF;
+    position: relative;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .bg-mesh {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(circle at 50% 12%, rgba(220, 225, 245, 0.13) 0%, transparent 45%),
+      radial-gradient(circle at 12% 45%, rgba(130, 140, 180, 0.09) 0%, transparent 50%),
+      radial-gradient(circle at 88% 65%, rgba(90, 110, 160, 0.08) 0%, transparent 50%),
+      linear-gradient(180deg, #07080A 0%, #101218 55%, #050608 100%);
+  }
+
+  .grid-pattern {
+    position: absolute;
+    inset: 0;
+    background-image: 
+      linear-gradient(to right, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+    background-size: 36px 36px;
+  }
+
+  .banner-header {
+    position: relative;
+    z-index: 10;
+    text-align: center;
+    padding: 75px 50px 0 50px;
+  }
+
+  .badge-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 22px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: #E2E8F0;
+    margin-bottom: 18px;
+  }
+
+  .badge-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #10B981;
+    box-shadow: 0 0 10px #10B981;
+  }
+
+  h1 {
+    font-size: 56px;
+    font-weight: 900;
+    line-height: 1.15;
+    letter-spacing: -0.025em;
+    background: linear-gradient(180deg, #FFFFFF 25%, #E2E8F0 60%, #94A3B8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 14px;
+  }
+
+  p.subtitle {
+    font-size: 24px;
+    color: #94A3B8;
+    font-weight: 400;
+    max-width: 820px;
+    margin: 0 auto;
+    line-height: 1.45;
+  }
+
+  /* Phone Mockup Frame */
+  .phone-wrapper {
+    position: relative;
+    z-index: 10;
+    width: 760px;
+    height: 1440px;
+    margin: 45px auto 0 auto;
+    border-radius: 54px;
+    padding: 12px;
+    background: linear-gradient(145deg, #323640 0%, #171920 50%, #0E0F14 100%);
+    box-shadow: 0 45px 120px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.18), inset 0 2px 4px rgba(255,255,255,0.22);
+  }
+
+  .phone-screen {
+    width: 100%;
+    height: 100%;
+    border-radius: 44px;
+    background: #090A0E;
+    overflow: hidden;
+    position: relative;
+    border: 1px solid rgba(255,255,255,0.06);
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Top Phone Status Bar */
+  .phone-statusbar {
+    height: 48px;
+    padding: 12px 32px 0 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 14px;
+    font-weight: 600;
+    color: #FFFFFF;
+    z-index: 20;
+    position: relative;
+  }
+
+  .island-notch {
+    width: 125px;
+    height: 28px;
+    background: #000000;
+    border-radius: 20px;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    top: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 12px;
+  }
+
+  .notch-camera {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #111827;
+    border: 1px solid #1F2937;
+  }
+
+  .statusbar-icons {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+  }
+
+  /* App Header Inside Phone */
+  .app-header {
+    padding: 14px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+
+  .app-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .brand-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #27272A 0%, #111827 100%);
+    border: 1px solid rgba(255,255,255,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 900;
+    font-size: 16px;
+    color: #FFFFFF;
+  }
+
+  .brand-title {
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: #FFFFFF;
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .icon-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .icon-btn svg {
+    width: 18px;
+    height: 18px;
+    stroke: #D1D5DB;
+    fill: none;
+    stroke-width: 2;
+  }
+
+  /* Main Scrollable Content inside screen */
+  .screen-body {
+    flex: 1;
+    overflow: hidden;
+    padding: 22px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  /* Bottom Navigation Bar Inside Phone */
+  .bottom-nav {
+    margin-top: auto;
+    height: 76px;
+    background: rgba(14, 16, 22, 0.96);
+    backdrop-filter: blur(20px);
+    border-top: 1px solid rgba(255,255,255,0.08);
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    padding: 0 10px;
+    z-index: 30;
+  }
+
+  .nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #64748B;
+  }
+
+  .nav-item.active {
+    color: #FFFFFF;
+  }
+
+  .nav-item.active svg {
+    stroke: #38BDF8;
+  }
+
+  .nav-item svg {
+    width: 22px;
+    height: 22px;
+    stroke: #64748B;
+    fill: none;
+    stroke-width: 2;
+  }
+</style>
+</head>
+<body>
+
+<div class="bg-mesh"></div>
+<div class="grid-pattern"></div>
+
+<div class="banner-header">
+  <div class="badge-tag">
+    <span class="badge-dot"></span>
+    Smart Milestones
+  </div>
+  <h1>Never Miss a Moment</h1>
+  <p class="subtitle">Live countdowns, progress meters & celebration alerts for all your cherished milestones.</p>
+</div>
+
+<div class="phone-wrapper">
+  <div class="phone-screen">
+    <!-- Status Bar -->
+    <div class="phone-statusbar">
+      <span>09:41</span>
+      <div class="island-notch">
+        <span class="notch-camera"></span>
+      </div>
+      <div class="statusbar-icons">
+        <span>5G</span>
+        <span>100%</span>
+      </div>
+    </div>
+
+    <!-- App Header -->
+    <div class="app-header">
+      <div class="app-brand">
+        <div class="brand-icon">M</div>
+        <div class="brand-title">Moment-Keeper</div>
+      </div>
+      <div class="header-actions">
+        <div class="icon-btn"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
+        <div class="icon-btn"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>
+      </div>
+    </div>
+
+    <!-- Screen Specific Body -->
+    <div class="screen-body">
+      
+  <!-- Filter Chips -->
+  <div style="display: flex; gap: 10px; overflow: hidden;">
+    <div style="padding: 8px 16px; border-radius: 999px; background: #FFFFFF; color: #000; font-size: 13px; font-weight: 700;">All (14)</div>
+    <div style="padding: 8px 16px; border-radius: 999px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #D1D5DB; font-size: 13px; font-weight: 600;">Birthdays (6)</div>
+    <div style="padding: 8px 16px; border-radius: 999px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #D1D5DB; font-size: 13px; font-weight: 600;">Anniversaries (4)</div>
+    <div style="padding: 8px 16px; border-radius: 999px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: #D1D5DB; font-size: 13px; font-weight: 600;">Trips (4)</div>
+  </div>
+
+  <!-- Featured Milestone Card -->
+  <div style="border-radius: 24px; background: linear-gradient(135deg, rgba(30, 34, 45, 0.9) 0%, rgba(18, 20, 26, 0.95) 100%); border: 1px solid rgba(255,255,255,0.14); padding: 22px; box-shadow: 0 16px 36px rgba(0,0,0,0.5);">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+      <span style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: #F59E0B; background: rgba(245, 158, 11, 0.15); padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(245,158,11,0.25);">Birthday Milestone</span>
+      <span style="font-size: 12px; color: #10B981; font-weight: 700; display: flex; align-items: center; gap: 5px;">
+        <span style="width: 6px; height: 6px; border-radius: 50%; background: #10B981;"></span> Proactive Alert Active
+      </span>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 16px;">
+      <div>
+        <h3 style="font-size: 24px; font-weight: 800; color: #FFFFFF; margin-bottom: 4px;">Sarah's 30th Birthday</h3>
+        <p style="font-size: 14px; color: #94A3B8;">Friday, October 24, 2026</p>
+      </div>
+      <div style="text-align: right;">
+        <span style="font-size: 42px; font-weight: 900; color: #FFFFFF; line-height: 1;">3</span>
+        <p style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #94A3B8; letter-spacing: 0.05em;">Days Left</p>
+      </div>
+    </div>
+
+    <!-- Progress Meter -->
+    <div style="margin-bottom: 16px;">
+      <div style="display: flex; justify-content: space-between; font-size: 12px; color: #94A3B8; margin-bottom: 6px;">
+        <span>Annual countdown cycle</span>
+        <span style="color: #F59E0B; font-weight: 700;">92% Completed</span>
+      </div>
+      <div style="width: 100%; height: 8px; border-radius: 999px; background: rgba(255,255,255,0.08); overflow: hidden;">
+        <div style="width: 92%; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #F59E0B 0%, #FBBF24 100%);"></div>
+      </div>
+    </div>
+
+    <!-- Action Chips -->
+    <div style="display: flex; gap: 8px;">
+      <div style="padding: 8px 14px; border-radius: 10px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); font-size: 12px; font-weight: 600; color: #E2E8F0; display: flex; align-items: center; gap: 6px;">
+        🎁 4 Gift Ideas Saved
+      </div>
+      <div style="padding: 8px 14px; border-radius: 10px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); font-size: 12px; font-weight: 600; color: #E2E8F0; display: flex; align-items: center; gap: 6px;">
+        🎵 Birthday Playlist Sync
+      </div>
+    </div>
+  </div>
+
+  <!-- Milestone Card 2 -->
+  <div style="border-radius: 20px; background: rgba(22, 24, 32, 0.85); border: 1px solid rgba(255,255,255,0.1); padding: 18px; display: flex; justify-content: space-between; align-items: center;">
+    <div>
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+        <span style="font-size: 10px; font-weight: 800; text-transform: uppercase; color: #EC4899; background: rgba(236,72,153,0.15); padding: 3px 8px; border-radius: 6px;">Anniversary</span>
+        <span style="font-size: 12px; color: #94A3B8;">Nov 04, 2026</span>
+      </div>
+      <h4 style="font-size: 18px; font-weight: 700; color: #FFFFFF; margin-bottom: 4px;">Our 5th Wedding Anniversary</h4>
+      <p style="font-size: 12px; color: #34D399;">Table reserved at The View (8:00 PM)</p>
+    </div>
+    <div style="text-align: right; background: rgba(255,255,255,0.04); padding: 10px 16px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.08);">
+      <span style="font-size: 28px; font-weight: 800; color: #FFFFFF; line-height: 1;">14</span>
+      <p style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: #94A3B8;">Days</p>
+    </div>
+  </div>
+
+  <!-- Milestone Card 3 -->
+  <div style="border-radius: 20px; background: rgba(22, 24, 32, 0.85); border: 1px solid rgba(255,255,255,0.1); padding: 18px; display: flex; justify-content: space-between; align-items: center;">
+    <div>
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+        <span style="font-size: 10px; font-weight: 800; text-transform: uppercase; color: #06B6D4; background: rgba(6,182,212,0.15); padding: 3px 8px; border-radius: 6px;">Vacation</span>
+        <span style="font-size: 12px; color: #94A3B8;">Dec 02, 2026</span>
+      </div>
+      <h4 style="font-size: 18px; font-weight: 700; color: #FFFFFF; margin-bottom: 4px;">Tokyo & Kyoto Winter Trip</h4>
+      <p style="font-size: 12px; color: #94A3B8;">Passports & JR Passes verified</p>
+    </div>
+    <div style="text-align: right; background: rgba(255,255,255,0.04); padding: 10px 16px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.08);">
+      <span style="font-size: 28px; font-weight: 800; color: #FFFFFF; line-height: 1;">42</span>
+      <p style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: #94A3B8;">Days</p>
+    </div>
+  </div>
+
+  <!-- Milestone Card 4 -->
+  <div style="border-radius: 20px; background: rgba(22, 24, 32, 0.85); border: 1px solid rgba(255,255,255,0.1); padding: 18px; display: flex; justify-content: space-between; align-items: center;">
+    <div>
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+        <span style="font-size: 10px; font-weight: 800; text-transform: uppercase; color: #A855F7; background: rgba(168,85,247,0.15); padding: 3px 8px; border-radius: 6px;">Career</span>
+        <span style="font-size: 12px; color: #94A3B8;">Dec 15, 2026</span>
+      </div>
+      <h4 style="font-size: 18px; font-weight: 700; color: #FFFFFF; margin-bottom: 4px;">Senior Architect Promotion</h4>
+      <p style="font-size: 12px; color: #94A3B8;">Quarterly evaluation milestone</p>
+    </div>
+    <div style="text-align: right; background: rgba(255,255,255,0.04); padding: 10px 16px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.08);">
+      <span style="font-size: 28px; font-weight: 800; color: #FFFFFF; line-height: 1;">55</span>
+      <p style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: #94A3B8;">Days</p>
+    </div>
+  </div>
+
+    </div>
+
+    <!-- Bottom Nav -->
+    <div class="bottom-nav">
+      <div class="nav-item active">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span>Moments</span>
+      </div>
+      <div class="nav-item ">
+        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <span>Calendar</span>
+      </div>
+      <div class="nav-item ">
+        <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <span>Vault</span>
+      </div>
+      <div class="nav-item ">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span>Settings</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

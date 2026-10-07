@@ -1,7 +1,6 @@
-// ─── SettingsPage Component ───────────────────────────────────
-
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '@/store/authStore';
+import { useUIStore } from '@/store/uiStore';
 import { Bell, Shield, Volume2, Monitor, HelpCircle, Eye } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
@@ -13,6 +12,7 @@ import { Capacitor, registerPlugin } from '@capacitor/core';
 
 export const SettingsPage: React.FC = () => {
   const { profile, user, updateProfileInfo, updateNotificationPrefs, updateThemePreference, updateReduceMotionPreference, updatePrivatePasskey } = useAuthStore();
+  const { setPrivateUnlocked } = useUIStore();
 
   const [name, setName] = useState(profile?.displayName || user?.displayName || profile?.email?.split('@')[0] || user?.email?.split('@')[0] || '');
   const [savingProfile, setSavingProfile] = useState(false);
@@ -21,16 +21,18 @@ export const SettingsPage: React.FC = () => {
   const [passkey, setPasskey] = useState('');
   const [savingPasskey, setSavingPasskey] = useState(false);
 
-
-
   const handlePasskeySave = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    const correctPasskey = String(profile?.privatePasskey || '1234');
-    if (currentPasskey !== correctPasskey) {
-      toast.error('Incorrect current passkey.');
-      hapticService.error();
-      return;
+
+    const existingPasskey = profile?.privatePasskey;
+
+    // If the user already has a passkey, verify the old one first
+    if (existingPasskey) {
+      if (currentPasskey !== existingPasskey) {
+        toast.error('Incorrect current passkey.');
+        hapticService.error();
+        return;
+      }
     }
 
     if (!/^\d{4}$/.test(passkey)) {
@@ -39,7 +41,7 @@ export const SettingsPage: React.FC = () => {
       return;
     }
 
-    if (currentPasskey === passkey) {
+    if (existingPasskey && currentPasskey === passkey) {
       toast.error('New passkey must be different from current passkey.');
       hapticService.error();
       return;
@@ -50,10 +52,11 @@ export const SettingsPage: React.FC = () => {
       hapticService.mediumImpact();
       await updatePrivatePasskey(passkey);
       toast.success('Private passkey updated successfully!');
-      
-      // Clear session unlock state for security so they must enter the new passcode to re-enter
-      sessionStorage.removeItem('isPrivateUnlocked');
-      
+
+      // MEDIUM FIX: Clear the in-memory unlock flag (NOT sessionStorage).
+      // This forces re-entry of the new passkey to access the private area.
+      setPrivateUnlocked(false);
+
       setPasskey('');
       setCurrentPasskey('');
       hapticService.success();
@@ -175,7 +178,7 @@ export const SettingsPage: React.FC = () => {
                     placeholder="••••"
                   />
                   <p className="text-[10px] text-mk-silver mt-1.5">
-                    Enter your existing passkey. Default is <span className="font-mono text-mk-white">1234</span>.
+                    {profile?.privatePasskey ? 'Enter your existing 4-digit passkey.' : 'No passkey set yet. Leave blank to configure a new passkey.'}
                   </p>
                 </div>
 

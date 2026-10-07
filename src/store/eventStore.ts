@@ -49,14 +49,14 @@ interface EventState {
   fetchEventsAndPersons: (userId: string) => Promise<() => void>;
   fetchArchivedEvents: (userId: string) => Promise<void>;
   
-  addEvent: (event: Omit<MKEvent, 'id' | 'userId' | 'createdAt' | 'updatedAt'> & { groupId?: string }) => Promise<string>;
+  addEvent: (event: Omit<MKEvent, 'id' | 'userId' | 'createdAt' | 'updatedAt'> & { groupId?: string }, options?: { skipRateLimit?: boolean }) => Promise<string>;
   editEvent: (id: string, data: Partial<MKEvent>) => Promise<void>;
   removeEvent: (id: string) => Promise<void>;
   archiveExistingEvent: (id: string) => Promise<void>;
   restoreArchivedEvent: (id: string) => Promise<void>;
   toggleFavoriteEvent: (id: string, current: boolean) => Promise<void>;
 
-  addPerson: (person: Omit<Person, 'id' | 'createdAt' | 'updatedAt'>, photoBlob?: Blob | null) => Promise<string>;
+  addPerson: (person: Omit<Person, 'id' | 'createdAt' | 'updatedAt'>, photoBlob?: Blob | null, options?: { skipRateLimit?: boolean }) => Promise<string>;
   editPerson: (id: string, data: Partial<Person>, photoBlob?: Blob | null) => Promise<void>;
   removePerson: (id: string) => Promise<void>;
   uploadPersonPicture: (personId: string, blob: Blob) => Promise<string>;
@@ -148,14 +148,20 @@ export const useEventStore = create<EventState>((set, get) => ({
       });
 
       // 2. Subscribe to persons profiles reactively
-      const unsubscribePersons = subscribeToPersons(userId, (personsList) => {
-        const enriched = personsList.map(p => {
-          const offlinePhoto = localStorage.getItem(`mk_offline_photo_${p.id}`);
-          if (offlinePhoto) {
-            return { ...p, photoUrl: offlinePhoto };
+      const unsubscribePersons = subscribeToPersons(userId, async (personsList) => {
+        // Load any cached offline photos from IndexedDB (not localStorage)
+        const enriched = await Promise.all(personsList.map(async (p) => {
+          try {
+            const offlineBlob = await idbGetPhoto(userId, p.id);
+            if (offlineBlob) {
+              const url = URL.createObjectURL(offlineBlob);
+              return { ...p, photoUrl: url };
+            }
+          } catch {
+            // IndexedDB unavailable — skip enrichment
           }
           return p;
-        });
+        }));
         set({ persons: enriched });
       });
 
@@ -183,19 +189,23 @@ export const useEventStore = create<EventState>((set, get) => ({
     // No-op since we subscribe to archived events reactively in fetchEventsAndPersons
   },
 
-  addEvent: async (event) => {
-    if (!checkRateLimit('addEvent', 1500)) {
+  addEvent: async (event, options) => {
+    if (!options?.skipRateLimit && !checkRateLimit('addEvent', 1500)) {
       throw new Error('You are creating events too quickly. Please wait a moment.');
     }
-    console.log("ZUSTAND addEvent received event payload:", event);
+    // Removed: console.log — do not log event payloads (personal data leaks in DevTools / adb logcat)
     let finalPayload = { ...event, isArchived: false } as any;
     
     if (event.isArchived) {
       const { encryptionService } = await import('@/services/encryptionService');
       const { useAuthStore } = await import('@/store/authStore');
       const { profile, user } = useAuthStore.getState();
-      const passkey = profile?.privatePasskey || '1234';
+      const passkey = profile?.privatePasskey;
       const uid = user?.uid || '';
+      // Guard: prevent encryption with an undefined/missing passkey
+      if (!passkey) {
+        throw new Error('Please set a private passkey in Settings before creating private events.');
+      }
       finalPayload = await encryptionService.encryptEvent(finalPayload, passkey, uid);
       finalPayload.isArchived = true;
     }
@@ -218,8 +228,11 @@ export const useEventStore = create<EventState>((set, get) => ({
       const { encryptionService } = await import('@/services/encryptionService');
       const { useAuthStore } = await import('@/store/authStore');
       const { profile, user } = useAuthStore.getState();
-      const passkey = profile?.privatePasskey || '1234';
+      const passkey = profile?.privatePasskey;
       const uid = user?.uid || '';
+      if (!passkey) {
+        throw new Error('Please set a private passkey in Settings before saving private events.');
+      }
       finalData = await encryptionService.encryptEvent(finalData as any, passkey, uid);
     }
     
@@ -238,8 +251,12 @@ export const useEventStore = create<EventState>((set, get) => ({
     const { encryptionService } = await import('@/services/encryptionService');
     const { useAuthStore } = await import('@/store/authStore');
     const { profile, user } = useAuthStore.getState();
-    const passkey = profile?.privatePasskey || '1234';
+    const passkey = profile?.privatePasskey;
     const uid = user?.uid || '';
+
+    if (!passkey) {
+      throw new Error('Please set a private passkey in Settings before archiving events.');
+    }
 
     // Encrypt event data before archiving
     const encryptedData = await encryptionService.encryptEvent(event, passkey, uid);
@@ -258,8 +275,12 @@ export const useEventStore = create<EventState>((set, get) => ({
     const { encryptionService } = await import('@/services/encryptionService');
     const { useAuthStore } = await import('@/store/authStore');
     const { profile, user } = useAuthStore.getState();
-    const passkey = profile?.privatePasskey || '1234';
+    const passkey = profile?.privatePasskey;
     const uid = user?.uid || '';
+
+    if (!passkey) {
+      throw new Error('Cannot restore: private passkey is not set. Please set your passkey in Settings.');
+    }
 
     // Decrypt the fields
     const decryptedEvent = await encryptionService.decryptEvent(event, passkey, uid);
@@ -281,8 +302,8 @@ export const useEventStore = create<EventState>((set, get) => ({
     await fbToggleFavorite(id, current);
   },
 
-  addPerson: async (person, photoBlob) => {
-    if (!checkRateLimit('addPerson', 1500)) {
+  addPerson: async (person, photoBlob, options) => {
+    if (!options?.skipRateLimit && !checkRateLimit('addPerson', 1500)) {
       throw new Error('You are creating profiles too quickly. Please wait a moment.');
     }
     const { useAuthStore } = await import('@/store/authStore');
@@ -312,11 +333,11 @@ export const useEventStore = create<EventState>((set, get) => ({
 
       if (isOfflineSaved) {
         try {
-          const base64 = await blobToBase64(photoBlob);
-          localStorage.setItem(`mk_offline_photo_${personId}`, base64);
+          // CRITICAL FIX: use IndexedDB with user.uid composite key to prevent cross-user account bleed
+          await idbSavePhoto(user.uid, personId, photoBlob);
           finalPhotoUrl = undefined;
         } catch (e) {
-          console.error('Failed to convert photo to Base64:', e);
+          console.error('Failed to cache photo offline in IndexedDB:', e);
         }
       }
     }
@@ -352,7 +373,7 @@ export const useEventStore = create<EventState>((set, get) => ({
         try {
           const downloadUrl = await uploadPersonPhoto(user.uid, id, photoBlob);
           finalData.photoUrl = downloadUrl;
-          localStorage.removeItem(`mk_offline_photo_${id}`);
+          await idbDeletePhoto(user.uid, id); // clear any cached offline copy
         } catch (err) {
           console.warn('Failed to upload photo online, caching offline:', err);
           isOfflineSaved = true;
@@ -363,11 +384,11 @@ export const useEventStore = create<EventState>((set, get) => ({
 
       if (isOfflineSaved) {
         try {
-          const base64 = await blobToBase64(photoBlob);
-          localStorage.setItem(`mk_offline_photo_${id}`, base64);
+          // CRITICAL FIX: use IndexedDB with user.uid composite key
+          await idbSavePhoto(user.uid, id, photoBlob);
           delete finalData.photoUrl;
         } catch (e) {
-          console.error('Failed to convert photo to Base64:', e);
+          console.error('Failed to cache photo offline in IndexedDB:', e);
         }
       }
     }
@@ -471,46 +492,89 @@ export const useEventStore = create<EventState>((set, get) => ({
   },
 }));
 
-const blobToBase64 = (blob: Blob): Promise<string> => {
+// ── IndexedDB Offline Photo Cache ─────────────────────────────
+// CRITICAL FIX: Store offline photos in IndexedDB instead of localStorage.
+// localStorage is accessible to any JS on the page (XSS risk) and has a 5 MB
+// per-origin quota. IndexedDB supports large binary blobs natively without Base64.
+
+const IDB_DB_NAME = 'mk_offline_cache';
+const IDB_STORE   = 'offline_photos';
+const IDB_VERSION = 1;
+
+function openOfflineDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
+    const req = indexedDB.open(IDB_DB_NAME, IDB_VERSION);
+    req.onupgradeneeded = (e) => {
+      (e.target as IDBOpenDBRequest).result.createObjectStore(IDB_STORE);
+    };
+    req.onsuccess = (e) => resolve((e.target as IDBOpenDBRequest).result);
+    req.onerror   = () => reject(req.error);
   });
-};
+}
+
+async function idbSavePhoto(userId: string, personId: string, blob: Blob): Promise<void> {
+  const db = await openOfflineDB();
+  return new Promise((resolve, reject) => {
+    const tx  = db.transaction(IDB_STORE, 'readwrite');
+    const req = tx.objectStore(IDB_STORE).put(blob, `${userId}:${personId}`);
+    req.onsuccess = () => resolve();
+    req.onerror   = () => reject(req.error);
+  });
+}
+
+async function idbGetPhoto(userId: string, personId: string): Promise<Blob | null> {
+  const db = await openOfflineDB();
+  return new Promise((resolve, reject) => {
+    const tx  = db.transaction(IDB_STORE, 'readonly');
+    const req = tx.objectStore(IDB_STORE).get(`${userId}:${personId}`);
+    req.onsuccess = () => resolve((req.result as Blob) ?? null);
+    req.onerror   = () => reject(req.error);
+  });
+}
+
+async function idbDeletePhoto(userId: string, personId: string): Promise<void> {
+  const db = await openOfflineDB();
+  return new Promise((resolve, reject) => {
+    const tx  = db.transaction(IDB_STORE, 'readwrite');
+    const req = tx.objectStore(IDB_STORE).delete(`${userId}:${personId}`);
+    req.onsuccess = () => resolve();
+    req.onerror   = () => reject(req.error);
+  });
+}
+
+async function idbGetAllKeys(): Promise<string[]> {
+  const db = await openOfflineDB();
+  return new Promise((resolve, reject) => {
+    const tx  = db.transaction(IDB_STORE, 'readonly');
+    const req = tx.objectStore(IDB_STORE).getAllKeys();
+    req.onsuccess = () => resolve(req.result as string[]);
+    req.onerror   = () => reject(req.error);
+  });
+}
 
 export const syncOfflinePhotos = async (userId: string) => {
-  const keys = Object.keys(localStorage);
-  const prefix = 'mk_offline_photo_';
-  const offlineKeys = keys.filter(key => key.startsWith(prefix));
+  let keys: string[] = [];
+  try {
+    keys = await idbGetAllKeys();
+  } catch {
+    return; // IndexedDB not available (e.g. private browsing on some browsers)
+  }
 
-  if (offlineKeys.length === 0) return;
+  // Filter keys belonging to this user: `${userId}:${personId}`
+  const userPrefix = `${userId}:`;
+  const userKeys = keys.filter(k => k.startsWith(userPrefix));
+  if (userKeys.length === 0) return;
 
-  console.log(`[OfflineSync] Found ${offlineKeys.length} offline photo(s) to sync.`);
   const { updatePerson, uploadPersonPhoto } = await import('@/lib/firestore');
 
-  for (const key of offlineKeys) {
-    const personId = key.substring(prefix.length);
-    const base64String = localStorage.getItem(key);
-    if (!base64String) continue;
-
+  for (const compositeKey of userKeys) {
+    const personId = compositeKey.slice(userPrefix.length);
     try {
-      const base64ToBlob = (base64: string, contentType = 'image/jpeg') => {
-        const byteCharacters = atob(base64.split(',')[1]);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        return new Blob([byteArray], { type: contentType });
-      };
-
-      const blob = base64ToBlob(base64String);
+      const blob = await idbGetPhoto(userId, personId);
+      if (!blob) continue;
       const downloadUrl = await uploadPersonPhoto(userId, personId, blob);
       await updatePerson(personId, { photoUrl: downloadUrl });
-      localStorage.removeItem(key);
-      console.log(`[OfflineSync] Synchronized photo for person ${personId}`);
+      await idbDeletePhoto(userId, personId);
     } catch (err) {
       console.error(`[OfflineSync] Failed to sync photo for person ${personId}:`, err);
     }

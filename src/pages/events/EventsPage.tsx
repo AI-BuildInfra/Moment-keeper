@@ -1,8 +1,8 @@
-// ─── EventsPage Component ─────────────────────────────────────
-
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useEventStore } from '@/store/eventStore';
 import { useAuthStore } from '@/store/authStore';
+import { useUIStore } from '@/store/uiStore';
 import { EventCard } from '@/components/events/EventCard';
 import { EventFormModal } from '@/components/events/EventFormModal';
 import { Search, Filter, Eye, Lock, Unlock, Delete } from 'lucide-react';
@@ -12,7 +12,9 @@ import { hapticService } from '@/services/hapticService';
 import { motion } from 'framer-motion';
 
 export const EventsPage: React.FC = () => {
+  const navigate = useNavigate();
   const { user, profile } = useAuthStore();
+  const { isPrivateUnlocked, setPrivateUnlocked } = useUIStore();
   const {
     archivedEvents,
     fetchEventsAndPersons,
@@ -32,10 +34,7 @@ export const EventsPage: React.FC = () => {
   const [editingEvent, setEditingEvent] = useState<MKEvent | null>(null);
   const [viewMode, setViewMode] = useState<'active' | 'archived'>('active');
 
-  // Passkey control for private memories
-  const [isPrivateUnlocked, setIsPrivateUnlocked] = useState<boolean>(() => {
-    return sessionStorage.getItem('isPrivateUnlocked') === 'true';
-  });
+  // Passkey modal state
   const [passkeyModalOpen, setPasskeyModalOpen] = useState(false);
   const [passcode, setPasscode] = useState('');
   const [isShaking, setIsShaking] = useState(false);
@@ -67,9 +66,15 @@ export const EventsPage: React.FC = () => {
   // Local decryption runner for private memories
   useEffect(() => {
     if (isPrivateUnlocked && archivedEvents.length > 0) {
+      const passkey = profile?.privatePasskey;
+      if (!passkey) {
+        toast.error('Please configure your 4-digit passkey in Settings before opening Private memories.');
+        setPrivateUnlocked(false);
+        setViewMode('active');
+        return;
+      }
       const decrypt = async () => {
         const { encryptionService } = await import('@/services/encryptionService');
-        const passkey = profile?.privatePasskey || '1234';
         const uid = user?.uid || '';
         const list = await encryptionService.decryptEvents(archivedEvents, passkey, uid);
         setDecryptedEvents(list);
@@ -78,7 +83,7 @@ export const EventsPage: React.FC = () => {
     } else {
       setDecryptedEvents([]);
     }
-  }, [isPrivateUnlocked, archivedEvents, profile, user]);
+  }, [isPrivateUnlocked, archivedEvents, profile, user, setPrivateUnlocked]);
 
   const activeEvents = getFilteredEvents();
 
@@ -125,6 +130,12 @@ export const EventsPage: React.FC = () => {
     if (isPrivateUnlocked) {
       setViewMode('archived');
     } else {
+      if (!profile?.privatePasskey) {
+        toast.error('No passkey configured. Please set your 4-digit passkey in Settings first.');
+        hapticService.error();
+        navigate('/settings');
+        return;
+      }
       setPasskeyModalOpen(true);
       setPasscode('');
     }
@@ -137,13 +148,12 @@ export const EventsPage: React.FC = () => {
       setPasscode(newPasscode);
       
       if (newPasscode.length === 4) {
-        const correctPasskey = String(profile?.privatePasskey || '1234');
+        const correctPasskey = profile?.privatePasskey;
         setTimeout(() => {
-          if (newPasscode === correctPasskey) {
+          if (correctPasskey && newPasscode === correctPasskey) {
             hapticService.success();
             toast.success('Access Granted');
-            sessionStorage.setItem('isPrivateUnlocked', 'true');
-            setIsPrivateUnlocked(true);
+            setPrivateUnlocked(true);
             setPasscode('');
             setPasskeyModalOpen(false);
             setViewMode('archived');
@@ -183,13 +193,12 @@ export const EventsPage: React.FC = () => {
           if (prev.length >= 4) return prev;
           const newPasscode = prev + num;
           if (newPasscode.length === 4) {
-            const correctPasskey = String(profile?.privatePasskey || '1234');
+            const correctPasskey = profile?.privatePasskey;
             setTimeout(() => {
-              if (newPasscode === correctPasskey) {
+              if (correctPasskey && newPasscode === correctPasskey) {
                 hapticService.success();
                 toast.success('Access Granted');
-                sessionStorage.setItem('isPrivateUnlocked', 'true');
-                setIsPrivateUnlocked(true);
+                setPrivateUnlocked(true);
                 setPasscode('');
                 setPasskeyModalOpen(false);
                 setViewMode('archived');
@@ -417,7 +426,7 @@ export const EventsPage: React.FC = () => {
             </div>
             
             <p className="text-[10px] text-mk-silver/40">
-              Default passcode is 1234
+              Enter the 4-digit passkey configured in Settings
             </p>
           </motion.div>
         </motion.div>

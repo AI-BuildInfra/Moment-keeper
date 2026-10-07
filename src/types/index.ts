@@ -81,7 +81,7 @@ export interface UserProfile {
   notificationPreferences: NotificationPreferences;
   theme: 'light' | 'dark' | 'system';
   reduceMotion: boolean;
-  privatePasskey?: string; // 4-digit passcode, defaults to "1234"
+  privatePasskey?: string; // 4-digit passcode configured by user (undefined until set)
   createdAt: string;
 }
 

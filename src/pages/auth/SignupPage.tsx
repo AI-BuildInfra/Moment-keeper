@@ -1,6 +1,6 @@
 // ─── SignupPage Component ────────────────────────────────────
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as zod from 'zod';
@@ -21,9 +21,15 @@ const signupSchema = zod.object({
 type SignupFormInputs = zod.infer<typeof signupSchema>;
 
 export const SignupPage: React.FC = () => {
-  const { signUp, loading, error } = useAuthStore();
+  const { user, initialized, signUp, loading, error } = useAuthStore();
   const { isOnline } = useUIStore();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (initialized && user) {
+      navigate('/', { replace: true });
+    }
+  }, [user, initialized, navigate]);
 
   const {
     register,
