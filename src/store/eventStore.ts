@@ -90,6 +90,14 @@ export const useEventStore = create<EventState>((set, get) => ({
     try {
       let unsubscribeEvents: (() => void) | null = null;
 
+      // Start subscription to personal events immediately so data is visible with zero delay
+      unsubscribeEvents = subscribeToVisibleEvents(userId, [], (eventsList) => {
+        set({ events: eventsList, loading: false });
+        import('@/services/notificationService').then(({ notificationService }) => {
+          notificationService.syncAllEventNotifications(eventsList);
+        }).catch((err) => console.warn('Failed to load notificationService:', err));
+      });
+
       const { useAuthStore } = await import('@/store/authStore');
       const userEmail = useAuthStore.getState().user?.email || null;
 
@@ -132,19 +140,19 @@ export const useEventStore = create<EventState>((set, get) => ({
           }
         }
 
-        // Whenever groups list changes, rebuild events subscription
-        if (unsubscribeEvents) {
-          unsubscribeEvents();
-        }
-
+        // Whenever groups list changes, rebuild events subscription if there are groups
         const groupIds = groupsList.map(g => g.id);
-        unsubscribeEvents = subscribeToVisibleEvents(userId, groupIds, (eventsList) => {
-          set({ events: eventsList, loading: false });
-          // Synchronize local notifications in the background
-          import('@/services/notificationService').then(({ notificationService }) => {
-            notificationService.syncAllEventNotifications(eventsList);
-          }).catch((err) => console.warn('Failed to load notificationService:', err));
-        });
+        if (groupIds.length > 0) {
+          if (unsubscribeEvents) {
+            unsubscribeEvents();
+          }
+          unsubscribeEvents = subscribeToVisibleEvents(userId, groupIds, (eventsList) => {
+            set({ events: eventsList, loading: false });
+            import('@/services/notificationService').then(({ notificationService }) => {
+              notificationService.syncAllEventNotifications(eventsList);
+            }).catch((err) => console.warn('Failed to load notificationService:', err));
+          });
+        }
       });
 
       // 2. Subscribe to persons profiles reactively
@@ -193,13 +201,21 @@ export const useEventStore = create<EventState>((set, get) => ({
     if (!options?.skipRateLimit && !checkRateLimit('addEvent', 1500)) {
       throw new Error('You are creating events too quickly. Please wait a moment.');
     }
-    // Removed: console.log — do not log event payloads (personal data leaks in DevTools / adb logcat)
-    let finalPayload = { ...event, isArchived: false } as any;
+    const { useAuthStore } = await import('@/store/authStore');
+    const { user } = useAuthStore.getState();
+    const currentUserId = user?.uid || (event as any).userId;
+
+    let finalPayload = {
+      ...event,
+      isFavorite: event.isFavorite ?? false,
+      tags: event.tags ?? [],
+      userId: currentUserId,
+      isArchived: false,
+    } as any;
     
     if (event.isArchived) {
       const { encryptionService } = await import('@/services/encryptionService');
-      const { useAuthStore } = await import('@/store/authStore');
-      const { profile, user } = useAuthStore.getState();
+      const { profile } = useAuthStore.getState();
       const passkey = profile?.privatePasskey;
       const uid = user?.uid || '';
       // Guard: prevent encryption with an undefined/missing passkey
@@ -346,6 +362,11 @@ export const useEventStore = create<EventState>((set, get) => ({
     await setDoc(personRef, {
       ...cleanPayload({
         ...person,
+        userId: user.uid,
+        isFavorite: person.isFavorite ?? false,
+        tags: person.tags ?? [],
+        giftIdeas: person.giftIdeas ?? [],
+        previousGifts: person.previousGifts ?? [],
         photoUrl: finalPhotoUrl || undefined,
       }),
       createdAt: serverTimestamp(),

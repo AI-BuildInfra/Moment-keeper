@@ -19,7 +19,7 @@ service cloud.firestore {
       return dateStr is string && dateStr.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
     }
 
-    // HIGH FIX #9: Validate spotifyUrl must be Spotify domain or absent.
+    // Validate spotifyUrl must be Spotify domain or absent
     function isValidSpotifyUrl(val) {
       return !('spotifyUrl' in val) ||
              val.spotifyUrl == null ||
@@ -28,15 +28,11 @@ service cloud.firestore {
     }
 
     // Users Collection rules
-    // Public user profile information is readable by authenticated users so members
-    // can view names in shared groups and invite collaborators by email.
-    // Private passkey secrets are stored in the /private/secrets subcollection, which
-    // is strictly restricted to the document owner only.
     match /users/{userId} {
       allow read: if isAuthenticated();
       allow write: if isOwner(userId) && !('privatePasskey' in request.resource.data);
 
-      // Private settings subcollection — only owner has access
+      // Private settings subcollection - only owner has access
       match /private/secrets {
         allow read, write: if isOwner(userId);
       }
@@ -62,13 +58,11 @@ service cloud.firestore {
         && isValidDatePattern(request.resource.data.date)
         && request.resource.data.category in ['birthday', 'anniversary', 'wedding', 'family', 'personal', 'holiday', 'business', 'custom']
         && request.resource.data.priority in ['low', 'medium', 'high', 'critical']
-        && request.resource.data.isFavorite is bool
-        && request.resource.data.isArchived is bool
-        && request.resource.data.tags is list
-        // LOW FIX #20: Enforce max lengths on optional text fields
+        && (!('isFavorite' in request.resource.data) || request.resource.data.isFavorite is bool)
+        && (!('isArchived' in request.resource.data) || request.resource.data.isArchived is bool)
+        && (!('tags' in request.resource.data) || request.resource.data.tags is list)
         && (!('description' in request.resource.data) || isValidString(request.resource.data.description, 0, 5000))
         && (!('notes' in request.resource.data) || isValidString(request.resource.data.notes, 0, 10000))
-        // HIGH FIX #9: Restrict spotifyUrl to Spotify domain only
         && isValidSpotifyUrl(request.resource.data);
 
       allow update: if isAuthenticated()
@@ -81,13 +75,11 @@ service cloud.firestore {
         && isValidDatePattern(request.resource.data.date)
         && request.resource.data.category in ['birthday', 'anniversary', 'wedding', 'family', 'personal', 'holiday', 'business', 'custom']
         && request.resource.data.priority in ['low', 'medium', 'high', 'critical']
-        && request.resource.data.isFavorite is bool
-        && request.resource.data.isArchived is bool
-        && request.resource.data.tags is list
-        // LOW FIX #20: Enforce max lengths on optional text fields
+        && (!('isFavorite' in request.resource.data) || request.resource.data.isFavorite is bool)
+        && (!('isArchived' in request.resource.data) || request.resource.data.isArchived is bool)
+        && (!('tags' in request.resource.data) || request.resource.data.tags is list)
         && (!('description' in request.resource.data) || isValidString(request.resource.data.description, 0, 5000))
         && (!('notes' in request.resource.data) || isValidString(request.resource.data.notes, 0, 10000))
-        // HIGH FIX #9: Restrict spotifyUrl to Spotify domain only
         && isValidSpotifyUrl(request.resource.data);
 
       allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
@@ -100,10 +92,10 @@ service cloud.firestore {
       allow create: if isAuthenticated()
         && request.resource.data.userId == request.auth.uid
         && isValidString(request.resource.data.name, 1, 100)
-        && request.resource.data.isFavorite is bool
-        && request.resource.data.tags is list
-        && request.resource.data.giftIdeas is list
-        && request.resource.data.previousGifts is list
+        && (!('isFavorite' in request.resource.data) || request.resource.data.isFavorite is bool)
+        && (!('tags' in request.resource.data) || request.resource.data.tags is list)
+        && (!('giftIdeas' in request.resource.data) || request.resource.data.giftIdeas is list)
+        && (!('previousGifts' in request.resource.data) || request.resource.data.previousGifts is list)
         && (!('nickname' in request.resource.data) || request.resource.data.nickname is string)
         && (!('gender' in request.resource.data) || request.resource.data.gender is string)
         && (!('photoUrl' in request.resource.data) || request.resource.data.photoUrl is string)
@@ -114,10 +106,10 @@ service cloud.firestore {
         && resource.data.userId == request.auth.uid
         && request.resource.data.userId == request.auth.uid
         && isValidString(request.resource.data.name, 1, 100)
-        && request.resource.data.isFavorite is bool
-        && request.resource.data.tags is list
-        && request.resource.data.giftIdeas is list
-        && request.resource.data.previousGifts is list
+        && (!('isFavorite' in request.resource.data) || request.resource.data.isFavorite is bool)
+        && (!('tags' in request.resource.data) || request.resource.data.tags is list)
+        && (!('giftIdeas' in request.resource.data) || request.resource.data.giftIdeas is list)
+        && (!('previousGifts' in request.resource.data) || request.resource.data.previousGifts is list)
         && (!('nickname' in request.resource.data) || request.resource.data.nickname is string)
         && (!('gender' in request.resource.data) || request.resource.data.gender is string)
         && (!('photoUrl' in request.resource.data) || request.resource.data.photoUrl is string)
@@ -129,7 +121,13 @@ service cloud.firestore {
 
     // Groups Collection rules
     match /groups/{groupId} {
-      allow read: if isAuthenticated() && (request.auth.uid in resource.data.memberIds);
+      allow read: if isAuthenticated() && (
+        request.auth.uid in resource.data.memberIds ||
+        (request.auth.token.email != null && (
+          request.auth.token.email in resource.data.memberIds ||
+          request.auth.token.email.lower() in resource.data.memberIds
+        ))
+      );
 
       allow create: if isAuthenticated()
         && request.resource.data.ownerId == request.auth.uid
@@ -139,10 +137,6 @@ service cloud.firestore {
         && request.resource.data.name.size() >= 1
         && request.resource.data.name.size() <= 100;
 
-      // Group privilege escalation fix:
-      // 1. Group owners can update any group field
-      // 2. Regular members can update non-structural fields (name, description)
-      // 3. Regular members can leave the group by removing ONLY their own UID from memberIds
       allow update: if isAuthenticated() && (
         resource.data.ownerId == request.auth.uid
         ||

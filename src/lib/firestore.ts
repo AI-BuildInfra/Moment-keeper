@@ -83,10 +83,11 @@ export const getEvents = async (userId: string): Promise<MKEvent[]> => {
     collection(db, COLLECTIONS.events),
     where('userId', '==', userId),
     where('isArchived', '==', false),
-    orderBy('date', 'asc'),
   );
   const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() } as MKEvent));
+  const events = snap.docs.map(d => ({ id: d.id, ...d.data() } as MKEvent));
+  events.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  return events;
 };
 
 export const getArchivedEvents = async (userId: string): Promise<MKEvent[]> => {
@@ -94,10 +95,11 @@ export const getArchivedEvents = async (userId: string): Promise<MKEvent[]> => {
     collection(db, COLLECTIONS.events),
     where('userId', '==', userId),
     where('isArchived', '==', true),
-    orderBy('updatedAt', 'desc'),
   );
   const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() } as MKEvent));
+  const events = snap.docs.map(d => ({ id: d.id, ...d.data() } as MKEvent));
+  events.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+  return events;
 };
 
 export const subscribeToEvents = (
@@ -108,11 +110,19 @@ export const subscribeToEvents = (
     collection(db, COLLECTIONS.events),
     where('userId', '==', userId),
     where('isArchived', '==', false),
-    orderBy('date', 'asc'),
   );
-  return onSnapshot(q, snap => {
-    callback(snap.docs.map(d => ({ id: d.id, ...d.data() } as MKEvent)));
-  });
+  return onSnapshot(
+    q,
+    snap => {
+      const events = snap.docs.map(d => ({ id: d.id, ...d.data() } as MKEvent));
+      events.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+      callback(events);
+    },
+    err => {
+      console.error('[subscribeToEvents] Firestore query error:', err);
+      callback([]);
+    }
+  );
 };
 
 export const createEvent = async (event: Omit<MKEvent, 'id' | 'createdAt' | 'updatedAt'>) => {
@@ -163,10 +173,11 @@ export const getPersons = async (userId: string): Promise<Person[]> => {
   const q = query(
     collection(db, COLLECTIONS.persons),
     where('userId', '==', userId),
-    orderBy('name', 'asc'),
   );
   const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() } as Person));
+  const persons = snap.docs.map(d => ({ id: d.id, ...d.data() } as Person));
+  persons.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  return persons;
 };
 
 export const createPerson = async (person: Omit<Person, 'id' | 'createdAt' | 'updatedAt'>) => {
@@ -256,10 +267,11 @@ export const getGroups = async (userId: string): Promise<Group[]> => {
   const q = query(
     collection(db, COLLECTIONS.groups),
     where('memberIds', 'array-contains', userId),
-    orderBy('name', 'asc'),
   );
   const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() } as Group));
+  const groups = snap.docs.map(d => ({ id: d.id, ...d.data() } as Group));
+  groups.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  return groups;
 };
 
 export const createGroup = async (group: Omit<Group, 'id' | 'createdAt'>) => {
@@ -299,19 +311,6 @@ export const subscribeToGroups = (
     where('memberIds', 'array-contains', userId)
   );
 
-  if (!email) {
-    return onSnapshot(q1, snap => {
-      const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as Group));
-      list.sort((a, b) => a.name.localeCompare(b.name));
-      callback(list);
-    });
-  }
-
-  const q2 = query(
-    collection(db, COLLECTIONS.groups),
-    where('memberIds', 'array-contains', email.toLowerCase().trim())
-  );
-
   let list1: Group[] = [];
   let list2: Group[] = [];
 
@@ -322,19 +321,42 @@ export const subscribeToGroups = (
         combined.push(g);
       }
     });
-    combined.sort((a, b) => a.name.localeCompare(b.name));
+    combined.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     callback(combined);
   };
 
-  const unsub1 = onSnapshot(q1, snap => {
-    list1 = snap.docs.map(d => ({ id: d.id, ...d.data() } as Group));
-    updateCombined();
-  });
+  const unsub1 = onSnapshot(
+    q1,
+    snap => {
+      list1 = snap.docs.map(d => ({ id: d.id, ...d.data() } as Group));
+      updateCombined();
+    },
+    err => {
+      console.warn('[subscribeToGroups] q1 error:', err);
+      callback([]);
+    }
+  );
 
-  const unsub2 = onSnapshot(q2, snap => {
-    list2 = snap.docs.map(d => ({ id: d.id, ...d.data() } as Group));
-    updateCombined();
-  });
+  if (!email) {
+    return unsub1;
+  }
+
+  const q2 = query(
+    collection(db, COLLECTIONS.groups),
+    where('memberIds', 'array-contains', email.toLowerCase().trim())
+  );
+
+  const unsub2 = onSnapshot(
+    q2,
+    snap => {
+      list2 = snap.docs.map(d => ({ id: d.id, ...d.data() } as Group));
+      updateCombined();
+    },
+    err => {
+      // Permission denied or index missing for email query must not disrupt user's primary groups
+      console.warn('[subscribeToGroups] q2 (email query) fallback/ignored:', err);
+    }
+  );
 
   return () => {
     unsub1();
@@ -412,11 +434,18 @@ export const subscribeToVisibleEvents = (
 
   // If user is in no groups, just subscribe to personal events
   if (groupIds.length === 0) {
-    return onSnapshot(qPersonal, snap => {
-      const personal = snap.docs.map(d => ({ id: d.id, ...d.data() } as MKEvent));
-      personal.sort((a, b) => a.date.localeCompare(b.date));
-      callback(personal);
-    });
+    return onSnapshot(
+      qPersonal,
+      snap => {
+        const personal = snap.docs.map(d => ({ id: d.id, ...d.data() } as MKEvent));
+        personal.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+        callback(personal);
+      },
+      err => {
+        console.error('[subscribeToVisibleEvents] Personal events error:', err);
+        callback([]);
+      }
+    );
   }
 
   // Query 2: Group events (events that belong to the groups user is in)
@@ -437,19 +466,33 @@ export const subscribeToVisibleEvents = (
       }
     });
     // Sort by date asc
-    combined.sort((a, b) => a.date.localeCompare(b.date));
+    combined.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
     callback(combined);
   };
 
-  const unsubPersonal = onSnapshot(qPersonal, snap => {
-    personalEvents = snap.docs.map(d => ({ id: d.id, ...d.data() } as MKEvent));
-    updateCombined();
-  });
+  const unsubPersonal = onSnapshot(
+    qPersonal,
+    snap => {
+      personalEvents = snap.docs.map(d => ({ id: d.id, ...d.data() } as MKEvent));
+      updateCombined();
+    },
+    err => {
+      console.error('[subscribeToVisibleEvents] Personal events error in group mode:', err);
+      updateCombined();
+    }
+  );
 
-  const unsubGroup = onSnapshot(qGroup, snap => {
-    groupEvents = snap.docs.map(d => ({ id: d.id, ...d.data() } as MKEvent));
-    updateCombined();
-  });
+  const unsubGroup = onSnapshot(
+    qGroup,
+    snap => {
+      groupEvents = snap.docs.map(d => ({ id: d.id, ...d.data() } as MKEvent));
+      updateCombined();
+    },
+    err => {
+      console.warn('[subscribeToVisibleEvents] Group events error:', err);
+      updateCombined();
+    }
+  );
 
   return () => {
     unsubPersonal();
@@ -507,12 +550,20 @@ export const subscribeToPersons = (
 ) => {
   const q = query(
     collection(db, COLLECTIONS.persons),
-    where('userId', '==', userId),
-    orderBy('name', 'asc')
+    where('userId', '==', userId)
   );
-  return onSnapshot(q, (snap) => {
-    callback(snap.docs.map(d => ({ id: d.id, ...d.data() } as Person)));
-  });
+  return onSnapshot(
+    q,
+    (snap) => {
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as Person));
+      list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      callback(list);
+    },
+    (err) => {
+      console.error('[subscribeToPersons] Firestore query error:', err);
+      callback([]);
+    }
+  );
 };
 
 export const subscribeToArchivedEvents = (
@@ -522,10 +573,18 @@ export const subscribeToArchivedEvents = (
   const q = query(
     collection(db, COLLECTIONS.events),
     where('userId', '==', userId),
-    where('isArchived', '==', true),
-    orderBy('updatedAt', 'desc')
+    where('isArchived', '==', true)
   );
-  return onSnapshot(q, (snap) => {
-    callback(snap.docs.map(d => ({ id: d.id, ...d.data() } as MKEvent)));
-  });
+  return onSnapshot(
+    q,
+    (snap) => {
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as MKEvent));
+      list.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+      callback(list);
+    },
+    (err) => {
+      console.error('[subscribeToArchivedEvents] Firestore query error:', err);
+      callback([]);
+    }
+  );
 };
